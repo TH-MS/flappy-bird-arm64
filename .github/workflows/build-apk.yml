@@ -19,17 +19,28 @@ jobs:
           APK_FILE=$(find . -maxdepth 1 -iname "*flappy*.apk" | head -n 1)
           if [ -n "$APK_FILE" ]; then
             echo "Found APK: $APK_FILE - extracting assets..."
-            apt-get update && apt-get install -y unzip python3
+            apt-get update && apt-get install -y unzip python3 curl
             bash tools/extract_assets.sh "$APK_FILE"
           else
             echo "No original APK found - building with placeholder art."
           fi
 
-      - name: Set up Godot export templates and debug keystore
+      - name: Install Godot Export Templates
         run: |
-          mkdir -p ~/.local/share/godot/export_templates ~/.config/godot
+          GODOT_VERSION="4.5.1.stable"
+          TEMPLATE_DIR="/github/home/.local/share/godot/export_templates/${GODOT_VERSION}"
+          mkdir -p "$TEMPLATE_DIR"
+          
+          echo "Downloading Godot export templates..."
+          curl -sL https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz -o templates.tpz
+          unzip -q templates.tpz
+          mv templates/* "$TEMPLATE_DIR/"
+          rm -rf templates.tpz templates
+
+      - name: Set up debug keystore
+        run: |
+          mkdir -p ~/.android
           if [ ! -f ~/.android/debug.keystore ]; then
-            mkdir -p ~/.android
             keytool -keyalg RSA -genkeypair -alias androiddebugkey -keystore ~/.android/debug.keystore \
               -storepass android -keypass android -validity 10000 \
               -dname "CN=Android Debug,O=Android,C=US" || true
@@ -37,11 +48,6 @@ jobs:
 
       - name: Import project and export APK
         run: |
-          GODOT_VERSION="4.5.1.stable"
-          TEMPLATE_DIR="~/.local/share/godot/export_templates/${GODOT_VERSION}"
-          mkdir -p "$TEMPLATE_DIR"
-          
-          # Use official template package location if needed, or headless export
           mkdir -p _apk
           godot --headless --export-release "Android arm64" _apk/flappy64.apk || godot --headless --export-debug "Android arm64" _apk/flappy64.apk
 
