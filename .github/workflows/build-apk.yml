@@ -46,10 +46,15 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US" || true
           fi
 
+      - name: Install Matching Android Build Tools
+        run: |
+          echo "Accepting licenses and installing build-tools 33.0.2..."
+          yes | sdkmanager --licenses || true
+          sdkmanager --install "build-tools;33.0.2" "platforms;android-33" || true
+
       - name: Import project and export APK
         run: |
           mkdir -p _apk
-          # Explicitly set JAVA_HOME so Godot's editor settings recognize the SDK path
           export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac))))
           godot --headless --export-release "Android arm64" _apk/flappy64.apk || godot --headless --export-debug "Android arm64" _apk/flappy64.apk
 
