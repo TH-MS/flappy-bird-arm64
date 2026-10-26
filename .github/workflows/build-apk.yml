@@ -29,6 +29,10 @@ jobs:
         run: |
           sed -i 's/use_gradle_build=true/use_gradle_build=false/' export_presets.cfg
           grep -n "gradle\|arm64" export_presets.cfg
+          # Godot refuses Android export unless ETC2/ASTC texture import is enabled
+          grep -q "import_etc2_astc" project.godot || \
+            sed -i 's#^renderer/rendering_method="mobile"#textures/vram_compression/import_etc2_astc=true\n&#' project.godot
+          grep -n "etc2" project.godot
 
       - uses: actions/setup-java@v4
         with:
