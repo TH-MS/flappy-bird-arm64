@@ -43,7 +43,7 @@ jobs:
           
           # Use official template package location if needed, or headless export
           mkdir -p _apk
-          godot --headless --export-release "Android" _apk/flappy64.apk || godot --headless --export-debug "Android" _apk/flappy64.apk
+          godot --headless --export-release "Android arm64" _apk/flappy64.apk || godot --headless --export-debug "Android arm64" _apk/flappy64.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
