@@ -56,6 +56,10 @@ jobs:
         run: |
           mkdir -p _apk
           export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac))))
+          
+          # Install the Android build template into the project directory for Gradle builds
+          godot --headless --install-android-build-template || true
+          
           godot --headless --export-release "Android arm64" _apk/flappy64.apk || godot --headless --export-debug "Android arm64" _apk/flappy64.apk
 
       - name: Upload APK artifact
