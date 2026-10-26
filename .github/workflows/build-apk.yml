@@ -32,7 +32,8 @@ jobs:
           mkdir -p "$TEMPLATE_DIR"
           
           echo "Downloading Godot export templates..."
-          curl -sL https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz -o templates.zip
+          # Use the official Godot asset mirror/release structure for templates
+          curl -sL https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_export_templates.tpz -o templates.zip
           unzip -q templates.zip
           mv export_templates/* "$TEMPLATE_DIR/" 2>/dev/null || mv templates/* "$TEMPLATE_DIR/" 2>/dev/null || true
           rm -rf templates.zip export_templates templates
