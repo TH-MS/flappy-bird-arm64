@@ -13,15 +13,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract original art + sounds (only if Flappy_Bird_1.3.apk is in the repo)
+      - name: Extract original art + sounds (uses any .apk in the repo root)
         timeout-minutes: 3
         run: |
-          if [ -f Flappy_Bird_1.3.apk ]; then
-            bash tools/extract_assets.sh Flappy_Bird_1.3.apk
+          APK="$(ls ./*.apk 2>/dev/null | head -1 || true)"
+          if [ -n "$APK" ]; then
+            echo "Using $APK"
+            bash tools/extract_assets.sh "$APK"
             ls -la assets/gfx assets/audio
           else
             echo "No original APK found - building with placeholder art."
           fi
+
+      - name: Force plain (non-Gradle) export
+        run: |
+          sed -i 's/use_gradle_build=true/use_gradle_build=false/' export_presets.cfg
+          grep -n "gradle\|arm64" export_presets.cfg
 
       - uses: actions/setup-java@v4
         with:
