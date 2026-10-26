@@ -1,5 +1,4 @@
 name: Build Android APK (arm64)
-
 on:
   workflow_dispatch:
   push:
@@ -8,63 +7,61 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 5 # <--- Prevents infinite hangs
-    container:
-      image: barichello/godot-ci:4.5.1
-
+    timeout-minutes: 25            # fail fast instead of hanging
+    env:
+      DEBIAN_FRONTEND: noninteractive
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract original art + sounds
+      - name: Extract original art + sounds (only if Flappy_Bird_1.3.apk is in the repo)
+        timeout-minutes: 3
         run: |
-          APK_FILE=$(find . -maxdepth 1 -iname "*flappy*.apk" | head -n 1)
-          if [ -n "$APK_FILE" ]; then
-            echo "Found APK: $APK_FILE - extracting assets..."
-            apt-get update && apt-get install -y unzip python3 curl
-            bash tools/extract_assets.sh "$APK_FILE"
+          if [ -f Flappy_Bird_1.3.apk ]; then
+            bash tools/extract_assets.sh Flappy_Bird_1.3.apk
+            ls -la assets/gfx assets/audio
           else
             echo "No original APK found - building with placeholder art."
           fi
 
-      - name: Install Godot Export Templates
-        run: |
-          GODOT_VERSION="4.5.1.stable"
-          TEMPLATE_DIR="/github/home/.local/share/godot/export_templates/${GODOT_VERSION}"
-          mkdir -p "$TEMPLATE_DIR"
-          
-          echo "Downloading Godot export templates..."
-          curl -sL https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_export_templates.tpz -o templates.zip
-          unzip -q templates.zip
-          mv export_templates/* "$TEMPLATE_DIR/" 2>/dev/null || mv templates/* "$TEMPLATE_DIR/" 2>/dev/null || true
-          rm -rf templates.zip export_templates templates
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
 
-      - name: Set up debug keystore
+      - name: Android SDK pieces Godot 4.5 wants
+        timeout-minutes: 8
         run: |
-          mkdir -p ~/.android
-          if [ ! -f ~/.android/debug.keystore ]; then
-            keytool -keyalg RSA -genkeypair -alias androiddebugkey -keystore ~/.android/debug.keystore \
-              -storepass android -keypass android -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US" || true
-          fi
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "build-tools;35.0.0" "platforms;android-35" | tail -3
 
-      - name: Install Matching Android Build Tools
+      - uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.5.1
+          use-dotnet: false
+          include-templates: true
+
+      - name: Configure Godot for Android
         run: |
-          echo "Accepting licenses and installing build-tools 33.0.2..."
-          yes | sdkmanager --licenses || true
-          sdkmanager --install "build-tools;33.0.2" "platforms;android-33" || true
+          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android \
+            -keystore "$HOME/debug.keystore" -storepass android \
+            -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
+          mkdir -p ~/.config/godot
+          envsubst < tools/editor_settings.tres > ~/.config/godot/editor_settings-4.tres
+          cp ~/.config/godot/editor_settings-4.tres ~/.config/godot/editor_settings-4.5.tres
+          cat ~/.config/godot/editor_settings-4.5.tres
 
-      - name: Import project and export APK
+      - name: Import assets
+        timeout-minutes: 5
+        run: timeout 240 godot --headless --editor --quit --path . || echo "import exited with $?"
+
+      - name: Export APK
+        timeout-minutes: 8
         run: |
-          mkdir -p _apk
-          export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac))))
-          
-          # Install the Android build template into the project directory for Gradle builds
-          godot --headless --install-android-build-template || true
-          
-          godot --headless --export-release "Android arm64" _apk/flappy64.apk || godot --headless --export-debug "Android arm64" _apk/flappy64.apk
+          mkdir -p build
+          timeout 420 godot --headless --verbose --path . --export-debug "Android arm64" build/flappy64.apk
+          ls -la build
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: flappy64-apk
-          path: _apk/flappy64.apk
+          path: build/flappy64.apk
