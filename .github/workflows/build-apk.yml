@@ -32,10 +32,10 @@ jobs:
           mkdir -p "$TEMPLATE_DIR"
           
           echo "Downloading Godot export templates..."
-          curl -sL https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz -o templates.tpz
-          unzip -q templates.tpz
-          mv templates/* "$TEMPLATE_DIR/"
-          rm -rf templates.tpz templates
+          curl -sL https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz -o templates.zip
+          unzip -q templates.zip
+          mv export_templates/* "$TEMPLATE_DIR/" 2>/dev/null || mv templates/* "$TEMPLATE_DIR/" 2>/dev/null || true
+          rm -rf templates.zip export_templates templates
 
       - name: Set up debug keystore
         run: |
