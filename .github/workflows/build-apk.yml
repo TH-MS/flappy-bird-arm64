@@ -32,7 +32,6 @@ jobs:
           mkdir -p "$TEMPLATE_DIR"
           
           echo "Downloading Godot export templates..."
-          # Use the official Godot asset mirror/release structure for templates
           curl -sL https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_export_templates.tpz -o templates.zip
           unzip -q templates.zip
           mv export_templates/* "$TEMPLATE_DIR/" 2>/dev/null || mv templates/* "$TEMPLATE_DIR/" 2>/dev/null || true
@@ -50,6 +49,8 @@ jobs:
       - name: Import project and export APK
         run: |
           mkdir -p _apk
+          # Explicitly set JAVA_HOME so Godot's editor settings recognize the SDK path
+          export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac))))
           godot --headless --export-release "Android arm64" _apk/flappy64.apk || godot --headless --export-debug "Android arm64" _apk/flappy64.apk
 
       - name: Upload APK artifact
