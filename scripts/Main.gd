@@ -190,6 +190,10 @@ var _go_hop_v := 0.0
 var _panel_best_shown := 0
 var _was_new_best := false
 
+var _splash_layer: CanvasLayer
+var _splash_left := 0.0          # seconds of splash still to show (0 = none)
+var _splash_fade := 0.0
+
 var _events: Array = []          # [seconds_left, Callable]
 var _players: Dictionary = {}
 
@@ -203,6 +207,7 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout)
 	_layout()
 	_enter_menu()
+	_build_splash()
 
 
 func _process(delta: float) -> void:
@@ -219,6 +224,7 @@ func _notification(what: int) -> void:
 
 ## Advance the whole game by `dt` seconds (frame-rate independent).
 func step(dt: float) -> void:
+	_step_splash(dt)
 	_run_events(dt)
 	_step_tweens(dt)
 
@@ -255,7 +261,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _on_press(p: Vector2) -> void:
-	if _fading_out:
+	if _fading_out or _splash_left > 0.0:
 		return
 	match state:
 		State.MENU, State.GAME_OVER:
@@ -673,3 +679,45 @@ func _run_events(dt: float) -> void:
 			cb.call()
 		else:
 			i += 1
+
+
+# ================================================================== splash (original: 2 s ".GEARS" screen)
+const SPLASH_PATH := "res://assets/gfx/splash.png"
+const SPLASH_TIME := 2.0
+const SPLASH_FADE := 0.3
+
+func _build_splash() -> void:
+	if not ResourceLoader.exists(SPLASH_PATH):
+		return
+	_splash_layer = CanvasLayer.new()
+	_splash_layer.layer = 20
+	add_child(_splash_layer)
+	var bg := ColorRect.new()
+	bg.color = Color.BLACK
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.name = "Bg"
+	_splash_layer.add_child(bg)
+	var img := TextureRect.new()
+	img.texture = load(SPLASH_PATH)
+	img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED   # image background is pure black, so it blends in
+	img.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	img.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_splash_layer.add_child(img)
+	_splash_left = SPLASH_TIME
+	_splash_fade = SPLASH_FADE
+
+
+func _step_splash(dt: float) -> void:
+	if _splash_layer == null:
+		return
+	if _splash_left > 0.0:
+		_splash_left = maxf(_splash_left - dt, 0.0)
+	elif _splash_fade > 0.0:
+		_splash_fade = maxf(_splash_fade - dt, 0.0)
+		_splash_layer.get_child(0).modulate.a = _splash_fade / SPLASH_FADE
+		_splash_layer.get_child(1).modulate.a = _splash_fade / SPLASH_FADE
+		if _splash_fade <= 0.0:
+			_splash_layer.queue_free()
+			_splash_layer = null

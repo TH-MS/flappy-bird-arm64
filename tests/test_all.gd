@@ -181,6 +181,9 @@ func run_game(hz: int) -> void:
 	main.best = 0
 	main.pipes.rng.seed = 12345
 	check(main.state == main.State.MENU, "%d Hz: starts in MENU" % hz)
+	for i in int(2.6 * hz):                              # wait out the 2 s splash (taps are ignored during it)
+		main.step(dt)
+	check(main._splash_layer == null, "%d Hz: splash screen finished and removed" % hz)
 	main._btn_play.action.call()                       # Play -> fade out -> READY
 	var guard := 0
 	while main.state != main.State.READY and guard < 600:

@@ -25,6 +25,14 @@ jobs:
             echo "No original APK found - building with placeholder art."
           fi
 
+      - name: Original launcher icon
+        timeout-minutes: 3
+        run: |
+          pip install --quiet pillow
+          python3 tools/make_icons.py tools/icon_source.png assets/icon
+          sed -i '/^\[preset.0.options\]/a launcher_icons/main_192x192="res://assets/icon/main.png"\nlauncher_icons/adaptive_foreground_432x432="res://assets/icon/adaptive_fg.png"\nlauncher_icons/adaptive_background_432x432="res://assets/icon/adaptive_bg.png"' export_presets.cfg
+          grep -n launcher_icons export_presets.cfg
+
       - name: Force plain (non-Gradle) export
         run: |
           sed -i 's/use_gradle_build=true/use_gradle_build=false/' export_presets.cfg

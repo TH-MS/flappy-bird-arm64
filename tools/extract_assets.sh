@@ -9,6 +9,7 @@ rm -rf "$HERE/_apk" && mkdir -p "$HERE/_apk" "$HERE/assets/gfx" "$HERE/assets/au
 unzip -q -o "$APK" -d "$HERE/_apk"           # an APK is a zip; assets/ and res/raw are stored as-is
 cp "$HERE/_apk/assets/gfx/atlas.png"        "$HERE/assets/gfx/atlas.png"      # 1024x1024 RGBA sprite sheet
 cp "$HERE/_apk/assets/sounds/"*.ogg         "$HERE/assets/audio/"             # Ogg Vorbis, 44.1 kHz
+cp "$HERE/_apk/res/drawable/splash.png"     "$HERE/assets/gfx/splash.png"     # 640x1136 ".GEARS" splash
 # sprite rectangles (UV format) live in res/raw/atlas.txt -> regenerate the Godot table:
 python3 "$HERE/tools/gen_atlas.py" "$HERE/_apk/res/raw/atlas.txt" "$HERE/scripts/Atlas.gd"
 
