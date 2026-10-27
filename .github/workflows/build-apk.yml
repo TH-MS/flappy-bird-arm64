@@ -36,6 +36,8 @@ jobs:
       - name: Force plain (non-Gradle) export
         run: |
           sed -i 's/use_gradle_build=true/use_gradle_build=false/' export_presets.cfg
+          # increasing version code per build: Android only accepts an update if it is not lower
+          sed -i "s/^version\/code=.*/version\/code=${{ github.run_number }}/; s/^version\/name=.*/version\/name=\"1.0.${{ github.run_number }}\"/" export_presets.cfg
           grep -n "gradle\|arm64" export_presets.cfg
           # Godot refuses Android export unless ETC2/ASTC texture import is enabled
           grep -q "import_etc2_astc" project.godot || \
@@ -61,9 +63,8 @@ jobs:
 
       - name: Configure Godot for Android
         run: |
-          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android \
-            -keystore "$HOME/debug.keystore" -storepass android \
-            -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
+          # fixed signing key (committed) so every build can install as an UPDATE over the last one
+          cp tools/debug.keystore "$HOME/debug.keystore"
           mkdir -p ~/.config/godot
           envsubst < tools/editor_settings.tres > ~/.config/godot/editor_settings-4.tres
           cp ~/.config/godot/editor_settings-4.tres ~/.config/godot/editor_settings-4.5.tres
