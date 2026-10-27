@@ -194,6 +194,14 @@ var _splash_layer: CanvasLayer
 var _splash_left := 0.0          # seconds of splash still to show (0 = none)
 var _splash_fade := 0.0
 
+const LB_H := 200.0              # leaderboard panel height (original panel is 126 px tall)
+const LB_ROWS := 5
+
+var scores: Array[int] = []      # personal top scores, best first
+var _lb: Node2D
+var _lb_ranks: Array[Sprite2D] = []
+var _lb_values: Array[DigitRow] = []
+
 var _events: Array = []          # [seconds_left, Callable]
 var _players: Dictionary = {}
 
@@ -265,6 +273,14 @@ func _on_press(p: Vector2) -> void:
 		return
 	match state:
 		State.MENU, State.GAME_OVER:
+			if _lb.visible:
+				var on_button := false
+				for b in _buttons:
+					if b.enabled and b.contains(p):
+						on_button = true
+				if not on_button:
+					_lb.visible = false        # tap anywhere else closes the list
+					return
 			for b in _buttons:
 				if b.enabled and b.contains(p):
 					b.set_down(true)
@@ -320,6 +336,7 @@ func _start_run() -> void:
 
 
 func _begin_restart() -> void:
+	_lb.visible = false
 	_sfx("swoosh")
 	_fading_out = true
 	_set_buttons(false, false, false)
@@ -383,7 +400,7 @@ func _show_game_over() -> void:
 	_was_new_best = score > best
 	if _was_new_best:
 		best = score
-		_save_best()                                  # persisted immediately, not at end of animation
+	_record_score()                                   # persisted immediately, not at end of animation
 	game_over.emit(score, best)
 	_sfx("swoosh")
 	_go_text.visible = true
@@ -535,6 +552,7 @@ func _build_scene() -> void:
 		sp.sprite.visible = false
 		_sparks.append(sp)
 
+	_build_leaderboard(ui)
 	_btn_play = _button("button_play", Vector2(20, 340), _begin_restart, ui)
 	_btn_score = _button("button_score", Vector2(152, 340), _on_score_button, ui)
 	_btn_rate = _button("button_rate", Vector2(107, 270), _on_rate_button, ui)
@@ -578,6 +596,9 @@ func _overlay(c: Color, layer: CanvasLayer) -> ColorRect:
 
 func _on_score_button() -> void:
 	_sfx("swoosh")
+	_lb.visible = not _lb.visible
+	if _lb.visible:
+		_refresh_leaderboard()
 	leaderboard_requested.emit()
 
 
@@ -654,11 +675,27 @@ func _load_best() -> void:
 	var cf := ConfigFile.new()
 	if cf.load(SAVE_PATH) == OK:
 		best = int(cf.get_value("score", "best", 0))
+		scores.clear()
+		for v in cf.get_value("scores", "top", []):
+			scores.append(int(v))
+		if scores.is_empty() and best > 0:
+			scores.append(best)                        # carry over a pre-existing high score
+
+
+func _record_score() -> void:
+	if score <= 0:
+		return
+	scores.append(score)
+	scores.sort_custom(func(a: int, b: int) -> bool: return a > b)
+	if scores.size() > LB_ROWS:
+		scores.resize(LB_ROWS)
+	_save_best()
 
 
 func _save_best() -> void:
 	var cf := ConfigFile.new()
 	cf.set_value("score", "best", best)
+	cf.set_value("scores", "top", scores)
 	var err := cf.save(SAVE_PATH)
 	if err != OK:
 		push_warning("Could not save high score (error %d)" % err)
@@ -721,3 +758,46 @@ func _step_splash(dt: float) -> void:
 		if _splash_fade <= 0.0:
 			_splash_layer.queue_free()
 			_splash_layer = null
+
+
+# ================================================================== personal top-5 list
+func _build_leaderboard(parent: Node) -> void:
+	_lb = Node2D.new()
+	_lb.position = Vector2(25.0, 110.0)
+	_lb.visible = false
+	parent.add_child(_lb)
+	# original score panel, cut into label-free strips: top / stretchable middle / bottom
+	_part("score_panel", Rect2i(0, 0, 238, 18), Vector2(0, 0))
+	var mid := _part("score_panel", Rect2i(0, 14, 238, 1), Vector2(0, 18))
+	mid.scale = Vector2(1.0, LB_H - 18.0 - 34.0)
+	_part("score_panel", Rect2i(0, 92, 238, 34), Vector2(0, LB_H - 34.0))
+	_part("score_panel", Rect2i(172, 60, 40, 14), Vector2(99, 26))          # the "BEST" label from the panel
+	for i in LB_ROWS:
+		var rank := Sprite2D.new()
+		rank.centered = false
+		rank.position = Vector2(34, 50 + i * 24)
+		rank.texture = Atlas.tex("number_score_%02d" % (i + 1))
+		_lb.add_child(rank)
+		_lb_ranks.append(rank)
+		var row := DigitRow.new()
+		row.hud_font = false
+		_lb.add_child(row)
+		_lb_values.append(row)
+
+
+func _part(sprite_name: String, r: Rect2i, pos: Vector2) -> Sprite2D:
+	var sp := Sprite2D.new()
+	sp.centered = false
+	sp.texture = Atlas.part(sprite_name, r)
+	sp.position = pos
+	_lb.add_child(sp)
+	return sp
+
+
+func _refresh_leaderboard() -> void:
+	for i in LB_ROWS:
+		var has := i < scores.size()
+		_lb_ranks[i].visible = has
+		_lb_values[i].visible = has
+		if has:
+			_lb_values[i].show_right(scores[i], 208.0, 50.0 + i * 24.0)

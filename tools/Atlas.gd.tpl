@@ -54,6 +54,20 @@ static func strip(sprite: String, row: int = 0) -> Texture2D:
 	_cache[key] = t
 	return t
 
+## A sub-rectangle (in sprite-local pixels) of a sprite, e.g. one label cut out of a panel.
+static func part(sprite: String, r: Rect2i) -> Texture2D:
+	var key := "%s@%s" % [sprite, r]
+	if _cache.has(key):
+		return _cache[key]
+	var base: Rect2i = RECTS[sprite]
+	var t: Texture2D
+	if _has_art():
+		t = _region(Rect2(base.position + r.position, r.size))
+	else:
+		t = _placeholder(sprite, r.size)
+	_cache[key] = t
+	return t
+
 static func _has_art() -> bool:
 	_load_sheet()
 	return _sheet != null

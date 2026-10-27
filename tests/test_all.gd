@@ -163,6 +163,9 @@ func run_all() -> void:
 	for hz in [60, 120]:
 		run_game(hz)
 
+	print("== Personal top 5 ==")
+	leaderboard_test()
+
 	print("== Layout on a 19.5:9 phone ==")
 	layout_test()
 
@@ -179,6 +182,7 @@ func run_game(hz: int) -> void:
 	var main: Node2D = load("res://Main.tscn").instantiate()
 	root.add_child(main)
 	main.best = 0
+	main.scores.clear()                                # isolate from scores saved by earlier test runs
 	main.pipes.rng.seed = 12345
 	check(main.state == main.State.MENU, "%d Hz: starts in MENU" % hz)
 	for i in int(2.6 * hz):                              # wait out the 2 s splash (taps are ignored during it)
@@ -222,6 +226,7 @@ func run_game(hz: int) -> void:
 	check(main._go_phase == 3 and main._btn_play.enabled, "%d Hz: panel finished, Play button shown" % hz)
 	check(main.best == main.score, "%d Hz: best score updated to %d" % [hz, main.best])
 
+	check(main.scores.size() >= 1 and main.scores[0] == main.score, "%d Hz: finished run recorded in personal top scores" % hz)
 	var cf := ConfigFile.new()
 	check(cf.load(main.SAVE_PATH) == OK and int(cf.get_value("score", "best", -1)) == main.score, "%d Hz: high score persisted with ConfigFile" % hz)
 	main.queue_free()
@@ -240,4 +245,29 @@ func layout_test() -> void:
 	check(is_equal_approx(v.x, 288.0) and v.y > 600.0, "tall phone keeps width 288 and expands height (%.0f)" % v.y)
 	check(is_equal_approx(main.world.position.y, v.y - 512.0), "playfield pinned to bottom; ground meets the screen bottom")
 	check(is_equal_approx(main.pipes.top_extension, v.y - 512.0), "pipes told about the extra sky")
+	main.queue_free()
+
+
+func leaderboard_test() -> void:
+	var main: Node2D = load("res://Main.tscn").instantiate()
+	root.add_child(main)
+	for i in 160:                                          # wait out the splash (taps are ignored during it)
+		main.step(1.0 / 60.0)
+	main.scores.clear()
+	for sc in [12, 45, 3, 31, 22, 9, 45, 1]:
+		main.score = sc
+		main._record_score()
+	check(main.scores == [45, 45, 31, 22, 12], "keeps the best 5 sorted (got %s)" % [main.scores])
+	main.score = 0
+	main._record_score()
+	check(main.scores.size() == 5, "a score of 0 is not recorded")
+	check(not main._lb.visible, "list hidden by default")
+	main._on_score_button()
+	check(main._lb.visible and main._lb_values[0].visible and main._lb_values[4].visible, "button opens list with 5 rows")
+	main._on_press(Vector2(10, 10))                       # tap outside any button
+	check(not main._lb.visible, "tapping elsewhere closes the list")
+	main.scores.clear()
+	main.scores.append(7)
+	main._on_score_button()
+	check(main._lb_values[0].visible and not main._lb_values[1].visible, "unused rows are hidden")
 	main.queue_free()
