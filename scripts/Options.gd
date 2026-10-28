@@ -131,7 +131,7 @@ func _build_button() -> void:
 	add_child(_btn)
 	_orange(_btn, 34.0)
 	for i in 3:                                           # three bars, white with the game's dark outline
-		var y := 7.0 + i * 5.0
+		var y := 5.0 + i * 5.0
 		_bar(_btn, Rect2(8, y - 1.0, 18, 5), BROWN)
 		_bar(_btn, Rect2(9, y, 16, 3), Color.WHITE)
 
