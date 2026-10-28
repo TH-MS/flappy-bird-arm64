@@ -197,6 +197,7 @@ var _splash_fade := 0.0
 const LB_H := 200.0              # leaderboard panel height (original panel is 126 px tall)
 const LB_ROWS := 5
 
+var _last_rank := -1             # row of the run that just ended in the top 5 (-1 = none), shown in yellow
 var scores: Array[int] = []      # personal top scores, best first
 var _lb: Node2D
 var _lb_ranks: Array[Sprite2D] = []
@@ -353,6 +354,7 @@ func _begin_restart() -> void:
 
 func _do_restart() -> void:
 	score = 0
+	_last_rank = -1
 	_pick_background()
 	bird.reset(rng.randi() % 3)
 	pipes.reset()
@@ -756,8 +758,11 @@ func _record_score() -> void:
 		return
 	scores.append(score)
 	scores.sort_custom(func(a: int, b: int) -> bool: return a > b)
+	_last_rank = scores.rfind(score)                   # ties: the new run ranks below equal older scores
 	if scores.size() > LB_ROWS:
 		scores.resize(LB_ROWS)
+	if _last_rank >= LB_ROWS:
+		_last_rank = -1
 	_save_best()
 
 
@@ -834,7 +839,8 @@ func _step_splash(dt: float) -> void:
 # ================================================================== personal top-5 list
 func _build_leaderboard(parent: Node) -> void:
 	_lb = Node2D.new()
-	_lb.position = Vector2(25.0, 110.0)
+	# bottom edge lines up exactly with the game-over score panel (y 193 + 126 = 319)
+	_lb.position = Vector2(25.0, (Config.GAME_H - Atlas.size_of("score_panel").y) * 0.5 + Atlas.size_of("score_panel").y - LB_H)
 	_lb.visible = false
 	parent.add_child(_lb)
 	# original score panel, cut into label-free strips: top / stretchable middle / bottom
@@ -872,3 +878,6 @@ func _refresh_leaderboard() -> void:
 		_lb_values[i].visible = has
 		if has:
 			_lb_values[i].show_right(scores[i], 208.0, 50.0 + i * 24.0)
+			var c := Color(1.0, 0.85, 0.1) if i == _last_rank else Color.WHITE   # this run's entry in yellow
+			_lb_ranks[i].modulate = c
+			_lb_values[i].modulate = c

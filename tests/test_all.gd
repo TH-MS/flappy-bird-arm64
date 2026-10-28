@@ -286,6 +286,25 @@ func leaderboard_test() -> void:
 	main._on_press(Vector2(10, 10))                       # tap outside any button
 	check(not main._lb.visible, "tapping elsewhere closes the list")
 	main.scores.clear()
+	for sc in [50, 40, 30, 20, 10]:
+		main.score = sc
+		main._record_score()
+	main.score = 35
+	main._record_score()
+	main._on_score_button()
+	check(main._last_rank == 2 and main._lb_values[2].modulate != Color.WHITE and main._lb_ranks[2].modulate != Color.WHITE, "just-set score (rank 3) is highlighted")
+	check(main._lb_values[1].modulate == Color.WHITE and main._lb_values[3].modulate == Color.WHITE, "other rows stay white")
+	main.score = 5
+	main._record_score()
+	check(main._last_rank == -1, "a run outside the top 5 highlights nothing")
+	main._do_restart()
+	main._on_score_button()
+	main._on_score_button()
+	main._refresh_leaderboard()
+	check(main._lb_values[2].modulate == Color.WHITE, "highlight cleared once a new run starts")
+	check(is_equal_approx(main._lb.position.y + main.LB_H, 193.0 + 126.0), "list bottom lines up with the score panel bottom")
+	main._lb.visible = false
+	main.scores.clear()
 	main.scores.append(7)
 	main._on_score_button()
 	check(main._lb_values[0].visible and not main._lb_values[1].visible, "unused rows are hidden")
