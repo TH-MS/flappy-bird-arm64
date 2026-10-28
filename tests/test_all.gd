@@ -239,6 +239,8 @@ func layout_test() -> void:
 	root.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
 	root.size = Vector2i(1220, 2670)
 	root.add_child(main)
+	main.lift_frac = 0.0                              # a saved option must not leak into the test
+	main.fps60 = false
 	main._layout()
 	var v: Vector2 = main._view
 	print("  viewport for 1220x2670 -> ", v)
