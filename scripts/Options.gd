@@ -13,14 +13,20 @@ signal closed
 
 const FONT_PATH := "res://assets/fonts/Silkscreen-Regular.ttf"
 const PANEL_W := 238.0
-const PANEL_H := 176.0
+const PANEL_H := 168.0
 const BROWN := Color(85.0 / 255.0, 48.0 / 255.0, 0.0)
 const LABEL := Color(252.0 / 255.0, 120.0 / 255.0, 88.0 / 255.0)    # salmon used by the original panel labels
 const BORDER := Color(84.0 / 255.0, 56.0 / 255.0, 71.0 / 255.0)
-const TRACK_X0 := 24.0
-const TRACK_X1 := 214.0
-const TRACK_Y := 84.0
-const FPS_BTN := Rect2(138.0, 104.0, 76.0, 28.0)
+const MARGIN := 24.0                  # left/right inner margin of the panel
+const CTRL_X0 := 112.0                # controls column (slider, button) x range
+const CTRL_X1 := 214.0
+const ROW1_Y := 60.0                  # vertical centre of the HEIGHT row
+const ROW2_Y := 94.0                  # vertical centre of the FRAMES row
+const TRACK_X0 := CTRL_X0
+const TRACK_X1 := CTRL_X1
+const TRACK_Y := ROW1_Y
+const FPS_BTN := Rect2(CTRL_X0, ROW2_Y - 14.0, CTRL_X1 - CTRL_X0, 28.0)
+const OK_Y := 116.0
 
 var frac := 0.0
 var cap60 := false
@@ -34,7 +40,7 @@ var _panel: Node2D
 var _knob: Node2D
 var _fps_text: Label
 var _hint: Label
-var _hint_r: Label
+var _groove: Node2D
 var _open := false
 var _drag := false
 var _pressed_fps := false
@@ -130,21 +136,39 @@ func _build_button() -> void:
 		_bar(_btn, Rect2(9, y, 16, 3), Color.WHITE)
 
 
-func _label(text: String, size: int, col: Color, pos: Vector2, w: float, align: int, outline: bool = false) -> Label:
+## Text drawn at 1x into a tiny viewport and shown as a sprite, so it is upscaled with the same
+## soft filtering as the original button art (the "OK" button) instead of being razor sharp.
+func _text(parent: Node, text: String, size: int, col: Color, rect: Rect2, align: int, shadow: Color = Color(0, 0, 0, 0)) -> Label:
+	var vp := SubViewport.new()
+	vp.size = Vector2i(rect.size)
+	vp.transparent_bg = true
+	vp.gui_disable_input = true
+	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+	add_child(vp)
 	var l := Label.new()
 	l.text = text
-	l.position = pos
-	l.size = Vector2(w, size + 4.0)
+	l.size = rect.size
 	l.horizontal_alignment = align as HorizontalAlignment
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	l.add_theme_font_override("font", _font)
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", col)
-	if outline:
-		l.add_theme_color_override("font_outline_color", BROWN)
-		l.add_theme_constant_override("outline_size", 4)
-	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_panel.add_child(l)
+	if shadow.a > 0.0:
+		l.add_theme_color_override("font_shadow_color", shadow)
+		l.add_theme_constant_override("shadow_offset_x", 0)
+		l.add_theme_constant_override("shadow_offset_y", maxi(size / 8, 1))
+	vp.add_child(l)
+	var sp := Sprite2D.new()
+	sp.centered = false
+	sp.texture = vp.get_texture()
+	sp.position = rect.position
+	parent.add_child(sp)
 	return l
+
+
+func _set_text(l: Label, text: String) -> void:
+	l.text = text
+	(l.get_parent() as SubViewport).render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
 func _build_panel() -> void:
@@ -154,49 +178,44 @@ func _build_panel() -> void:
 	_slice(_panel, "score_panel", Rect2i(0, 14, 238, 1), Vector2(0, 18), Vector2(1.0, PANEL_H - 18.0 - 34.0))
 	_slice(_panel, "score_panel", Rect2i(0, 92, 238, 34), Vector2(0, PANEL_H - 34.0))
 
-	_label("OPTIONS", 16, LABEL, Vector2(0, 18), PANEL_W, HORIZONTAL_ALIGNMENT_CENTER)
-	_label("HEIGHT", 16, LABEL, Vector2(TRACK_X0, 46), 120.0, HORIZONTAL_ALIGNMENT_LEFT)
-	# slider groove
-	_bar(_panel, Rect2(TRACK_X0, TRACK_Y - 2.0, TRACK_X1 - TRACK_X0, 8), BROWN)
-	_bar(_panel, Rect2(TRACK_X0 + 2.0, TRACK_Y, TRACK_X1 - TRACK_X0 - 4.0, 4), Color(1, 1, 1))
+	_text(_panel, "OPTIONS", 16, LABEL, Rect2(0, 14, PANEL_W, 28), HORIZONTAL_ALIGNMENT_CENTER)
+	_text(_panel, "HEIGHT", 16, LABEL, Rect2(MARGIN, ROW1_Y - 14.0, CTRL_X0 - MARGIN, 28), HORIZONTAL_ALIGNMENT_LEFT)
+	_text(_panel, "FRAMES", 16, LABEL, Rect2(MARGIN, ROW2_Y - 14.0, CTRL_X0 - MARGIN, 28), HORIZONTAL_ALIGNMENT_LEFT)
+	# slider groove: dark border + white inner, same palette as the buttons
+	_groove = Node2D.new()
+	_panel.add_child(_groove)
+	_bar(_groove, Rect2(TRACK_X0, TRACK_Y - 4.0, TRACK_X1 - TRACK_X0, 8), BROWN)
+	_bar(_groove, Rect2(TRACK_X0 + 2.0, TRACK_Y - 2.0, TRACK_X1 - TRACK_X0 - 4.0, 4), Color.WHITE)
 	_knob = Node2D.new()
 	_panel.add_child(_knob)
 	_orange(_knob, 20.0)
-	_knob.position = Vector2(0, TRACK_Y - 12.0)
-	_hint = _label("", 8, BORDER, Vector2(TRACK_X0, 96), TRACK_X1 - TRACK_X0, HORIZONTAL_ALIGNMENT_LEFT)
-	_hint_r = _label("", 8, BORDER, Vector2(TRACK_X0, 96), TRACK_X1 - TRACK_X0, HORIZONTAL_ALIGNMENT_RIGHT)
+	_knob.position = Vector2(0, ROW1_Y - 14.0)
+	_hint = _text(_panel, "", 8, BORDER, Rect2(MARGIN, 38, CTRL_X1 - MARGIN, 10), HORIZONTAL_ALIGNMENT_RIGHT)
 
-	_label("FRAMES", 16, LABEL, Vector2(TRACK_X0, 106), 110.0, HORIZONTAL_ALIGNMENT_LEFT)
 	var fb := Node2D.new()
 	fb.position = FPS_BTN.position
 	_panel.add_child(fb)
 	_orange(fb, FPS_BTN.size.x)
-	_fps_text = Label.new()
-	_fps_text.position = Vector2(0, 5)
-	_fps_text.size = Vector2(FPS_BTN.size.x, 20)
-	_fps_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_fps_text.add_theme_font_override("font", _font)
-	_fps_text.add_theme_font_size_override("font_size", 16)
-	_fps_text.add_theme_color_override("font_color", Color.WHITE)
-	_fps_text.add_theme_color_override("font_outline_color", BROWN)
-	_fps_text.add_theme_constant_override("outline_size", 4)
-	_fps_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fb.add_child(_fps_text)
+	_fps_text = _text(fb, "AUTO", 16, Color.WHITE, Rect2(0, 0, FPS_BTN.size.x, 28), HORIZONTAL_ALIGNMENT_CENTER, Color(191.0 / 255.0, 78.0 / 255.0, 0.0))
 
 	_ok = Sprite2D.new()
 	_ok.centered = false
 	_ok.texture = Atlas.tex("button_ok")
-	_ok.position = Vector2((PANEL_W - 80.0) * 0.5, PANEL_H - 40.0)
+	_ok.position = Vector2((PANEL_W - 80.0) * 0.5, OK_Y)
 	_panel.add_child(_ok)
 
 
 func _refresh() -> void:
 	var enabled := spare >= 1.0
-	_knob.position.x = TRACK_X0 + frac * (TRACK_X1 - TRACK_X0 - 20.0) + 0.0
+	_knob.position.x = TRACK_X0 + frac * (TRACK_X1 - TRACK_X0 - 20.0)
 	_knob.modulate = Color.WHITE if enabled else Color(1, 1, 1, 0.4)
-	_hint.text = "LOW" if enabled else "NO SPARE HEIGHT"
-	_hint_r.text = "HIGH" if enabled else ""
-	_fps_text.text = "60 MAX" if cap60 else "AUTO"
+	_groove.modulate = _knob.modulate
+	var hint := "" if enabled else "NO SPARE HEIGHT"
+	if _hint.text != hint:
+		_set_text(_hint, hint)
+	var t := "60 MAX" if cap60 else "AUTO"
+	if _fps_text.text != t:
+		_set_text(_fps_text, t)
 
 
 # ------------------------------------------------------------------ input
@@ -246,7 +265,7 @@ func _press_open(p: Vector2) -> void:
 	var q := p - _panel.position
 	_pressed_ok = false
 	_pressed_fps = false
-	if Rect2(TRACK_X0 - 14.0, TRACK_Y - 22.0, TRACK_X1 - TRACK_X0 + 28.0, 48.0).has_point(q) and spare >= 1.0:
+	if Rect2(TRACK_X0 - 14.0, ROW1_Y - 20.0, TRACK_X1 - TRACK_X0 + 28.0, 40.0).has_point(q) and spare >= 1.0:
 		_drag = true
 		_panel.modulate.a = 0.35                          # see-through while dragging so the result is visible
 		_set_from_x(q.x)
@@ -271,7 +290,7 @@ func _release_open(p: Vector2) -> void:
 			fps_changed.emit(cap60)
 	if _pressed_ok:
 		_pressed_ok = false
-		_ok.position.y = PANEL_H - 40.0
+		_ok.position.y = OK_Y
 		if Rect2(_ok.position, Vector2(80, 28)).grow(8.0).has_point(q):
 			close()
 	elif not Rect2(Vector2.ZERO, Vector2(PANEL_W, PANEL_H)).has_point(q) and not _pressed_fps and not was_drag:

@@ -547,11 +547,11 @@ func _build_scene() -> void:
 	_title = _spr("title", ui, Vector2((Config.GAME_W - 178) * 0.5, 150))
 	_copyright = Label.new()                      # real text (Silkscreen) instead of the low-res sprite
 	_copyright.text = "\u00a9 .GEARS 2013"
-	_copyright.position = Vector2(0, 417)
-	_copyright.size = Vector2(Config.GAME_W, 14)
+	_copyright.position = Vector2(0, 415)
+	_copyright.size = Vector2(Config.GAME_W, 20)
 	_copyright.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_copyright.add_theme_font_override("font", Options.make_font())
-	_copyright.add_theme_font_size_override("font_size", 8)
+	_copyright.add_theme_font_size_override("font_size", 14)
 	_copyright.add_theme_color_override("font_color", Color(250.0 / 255.0, 250.0 / 255.0, 250.0 / 255.0))
 	_copyright.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.35))
 	_copyright.add_theme_constant_override("shadow_offset_x", 0)
