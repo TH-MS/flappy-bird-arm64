@@ -240,7 +240,7 @@ func _notification(what: int) -> void:
 ## Advance the whole game by `dt` seconds (frame-rate independent).
 func step(dt: float) -> void:
 	_step_splash(dt)
-	_opts.set_button_visible(state == State.MENU and _splash_left <= 0.0 and _splash_layer == null and not _fading_out)
+	_opts.set_button_visible((state == State.MENU or state == State.READY) and _splash_left <= 0.0 and _splash_layer == null and not _fading_out)
 	_run_events(dt)
 	_step_tweens(dt)
 

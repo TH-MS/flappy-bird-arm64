@@ -194,6 +194,13 @@ func run_game(hz: int) -> void:
 		main.step(dt); guard += 1
 	check(main.state == main.State.READY, "%d Hz: Play button leads to READY after fade" % hz)
 
+	main.step(dt)
+	check(main._opts._btn.visible, "%d Hz: options button available on the Get Ready screen" % hz)
+	main._opts.open()                                  # open it: the run must not start by itself
+	for i in 30: main.step(dt)
+	check(main.state == main.State.READY and main._opts.is_open(), "%d Hz: Get Ready waits while options are open" % hz)
+	main._opts.close()
+	check(main.state == main.State.READY, "%d Hz: closing options keeps Get Ready" % hz)
 	main._on_press(Vector2.ZERO)                       # first tap
 	check(main.state == main.State.PLAYING, "%d Hz: first tap starts the run" % hz)
 
