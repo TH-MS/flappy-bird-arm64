@@ -245,6 +245,16 @@ func layout_test() -> void:
 	check(is_equal_approx(v.x, 288.0) and v.y > 600.0, "tall phone keeps width 288 and expands height (%.0f)" % v.y)
 	check(is_equal_approx(main.world.position.y, v.y - 512.0), "playfield pinned to bottom; ground meets the screen bottom")
 	check(is_equal_approx(main.pipes.top_extension, v.y - 512.0), "pipes told about the extra sky")
+	main.lift_frac = 0.5
+	main._layout()
+	check(is_equal_approx(main.world.position.y, (v.y - 512.0) * 0.5), "options: half lift raises the playfield by half the spare height")
+	check(main._fill[0].visible, "options: ground extended below the lifted playfield")
+	main.lift_frac = 1.0
+	main._layout()
+	check(is_equal_approx(main.world.position.y, 0.0), "options: max lift keeps the whole 512 px playfield on screen (never above the top)")
+	main.lift_frac = 0.0
+	main._layout()
+	check(is_equal_approx(main.world.position.y, v.y - 512.0) and not main._fill[0].visible, "options: 0 = original lowest position")
 	main.queue_free()
 
 

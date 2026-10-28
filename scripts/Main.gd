@@ -157,7 +157,7 @@ var _view := Vector2(Config.GAME_W, Config.GAME_H)
 
 var _hud: DigitRow
 var _title: Sprite2D
-var _copyright: Sprite2D
+var _copyright: Label
 var _ready_text: Sprite2D
 var _tutorial: Sprite2D
 var _go_text: Sprite2D
@@ -202,6 +202,12 @@ var _lb: Node2D
 var _lb_ranks: Array[Sprite2D] = []
 var _lb_values: Array[DigitRow] = []
 
+var lift_frac := 0.0             # options: 0 = original (lowest) position, 1 = highest that fits
+var fps60 := false               # options: cap at 60 fps
+var _lift := 0.0                 # lift in view units
+var _opts: Options
+var _fill: Array[Sprite2D] = []  # ground extension below the playfield when it is lifted
+
 var _events: Array = []          # [seconds_left, Callable]
 var _players: Dictionary = {}
 
@@ -212,6 +218,7 @@ func _ready() -> void:
 	_load_best()
 	_build_scene()
 	_build_audio()
+	_apply_fps()
 	get_viewport().size_changed.connect(_layout)
 	_layout()
 	_enter_menu()
@@ -233,6 +240,7 @@ func _notification(what: int) -> void:
 ## Advance the whole game by `dt` seconds (frame-rate independent).
 func step(dt: float) -> void:
 	_step_splash(dt)
+	_opts.set_button_visible(state == State.MENU and _splash_left <= 0.0 and _splash_layer == null and not _fading_out)
 	_run_events(dt)
 	_step_tweens(dt)
 
@@ -524,11 +532,30 @@ func _build_scene() -> void:
 
 	for i in 3:
 		_land_tiles.append(_spr("land", world))
+	for i in 3:                                      # 1-px sand row stretched down when the playfield is lifted
+		var f := Sprite2D.new()
+		f.centered = false
+		f.texture = Atlas.strip("land", 111)
+		f.visible = false
+		world.add_child(f)
+		_fill.append(f)
 
 	var ui := Node2D.new()
 	world.add_child(ui)
 	_title = _spr("title", ui, Vector2((Config.GAME_W - 178) * 0.5, 150))
-	_copyright = _spr("brand_copyright", ui, Vector2((Config.GAME_W - 126) * 0.5, 418))
+	_copyright = Label.new()                      # real text (Silkscreen) instead of the low-res sprite
+	_copyright.text = "\u00a9 .GEARS 2013"
+	_copyright.position = Vector2(0, 417)
+	_copyright.size = Vector2(Config.GAME_W, 14)
+	_copyright.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_copyright.add_theme_font_override("font", Options.make_font())
+	_copyright.add_theme_font_size_override("font_size", 8)
+	_copyright.add_theme_color_override("font_color", Color(250.0 / 255.0, 250.0 / 255.0, 250.0 / 255.0))
+	_copyright.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.35))
+	_copyright.add_theme_constant_override("shadow_offset_x", 0)
+	_copyright.add_theme_constant_override("shadow_offset_y", 1)
+	_copyright.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(_copyright)
 	_ready_text = _spr("text_ready", ui, Vector2((Config.GAME_W - 196) * 0.5, 146))
 	_tutorial = _spr("tutorial", ui, Vector2((Config.GAME_W - 114) * 0.5, 220))
 	_go_text = _spr("text_game_over", ui, Vector2(42, 130))
@@ -563,6 +590,13 @@ func _build_scene() -> void:
 	add_child(layer)
 	_flash_rect = _overlay(Color(1, 1, 1, 0), layer)
 	_fade_rect = _overlay(Color(0, 0, 0, 0), layer)
+
+	_opts = Options.new()
+	add_child(_opts)
+	_opts.set_values(lift_frac, fps60)
+	_opts.lift_changed.connect(_on_lift_changed)
+	_opts.fps_changed.connect(_on_fps_changed)
+	_opts.closed.connect(_save_best)
 
 
 func _spr(sprite_name: String, parent: Node, pos: Vector2 = Vector2.ZERO) -> Sprite2D:
@@ -625,8 +659,10 @@ func _pick_background() -> void:
 # ================================================================== layout (any aspect ratio)
 func _layout() -> void:
 	_view = get_viewport_rect().size
-	var off := Vector2((_view.x - Config.GAME_W) * 0.5, _view.y - Config.GAME_H)
-	world.position = off                              # bottom-centre anchoring
+	var spare := maxf(_view.y - Config.GAME_H, 0.0)        # extra height this screen has beyond 512
+	_lift = roundf(lift_frac * spare)
+	var off := Vector2((_view.x - Config.GAME_W) * 0.5, _view.y - Config.GAME_H - _lift)
+	world.position = off                              # bottom-centre anchoring, raised by _lift
 	var extra_top := maxf(off.y, 0.0)
 	var left := -off.x
 	var right := _view.x - off.x
@@ -642,6 +678,34 @@ func _layout() -> void:
 	_bg_top.position = Vector2(first, -extra_top - 8.0)
 	_bg_top.scale = Vector2(float(_bg_tiles.size()), extra_top + 8.0)
 	_place_ground()
+	_layout_options(spare)
+
+
+func _layout_options(spare: float) -> void:
+	var win := Vector2(DisplayServer.window_get_size())
+	var k := _view.x / maxf(win.x, 1.0)                   # window pixels -> view units
+	var safe := DisplayServer.get_display_safe_area()
+	var top := 0.0
+	var right := 0.0
+	if safe.size.x > 0 and win.x > 0:
+		top = maxf(float(safe.position.y), 0.0) * k
+		right = maxf(win.x - float(safe.end.x), 0.0) * k
+	_opts.layout(_view, minf(top, 80.0), minf(right, 40.0), spare)
+
+
+func _on_lift_changed(f: float) -> void:
+	lift_frac = f
+	_layout()
+
+
+func _on_fps_changed(cap: bool) -> void:
+	fps60 = cap
+	_apply_fps()
+	_save_best()
+
+
+func _apply_fps() -> void:
+	Engine.max_fps = 60 if fps60 else 0
 
 
 func _place_ground() -> void:
@@ -650,6 +714,9 @@ func _place_ground() -> void:
 	var first := floorf((left - base) / Config.LAND_W) * Config.LAND_W + base
 	for i in _land_tiles.size():
 		_land_tiles[i].position = Vector2(first + i * Config.LAND_W, float(Config.GROUND_Y))
+		_fill[i].position = Vector2(first + i * Config.LAND_W, float(Config.GAME_H) - 1.0)
+		_fill[i].scale = Vector2(1.0, _lift + 9.0)
+		_fill[i].visible = _lift > 0.0
 
 
 # ================================================================== audio
@@ -680,6 +747,8 @@ func _load_best() -> void:
 			scores.append(int(v))
 		if scores.is_empty() and best > 0:
 			scores.append(best)                        # carry over a pre-existing high score
+		lift_frac = clampf(float(cf.get_value("options", "lift", 0.0)), 0.0, 1.0)
+		fps60 = bool(cf.get_value("options", "fps60", false))
 
 
 func _record_score() -> void:
@@ -696,6 +765,8 @@ func _save_best() -> void:
 	var cf := ConfigFile.new()
 	cf.set_value("score", "best", best)
 	cf.set_value("scores", "top", scores)
+	cf.set_value("options", "lift", lift_frac)
+	cf.set_value("options", "fps60", fps60)
 	var err := cf.save(SAVE_PATH)
 	if err != OK:
 		push_warning("Could not save high score (error %d)" % err)
