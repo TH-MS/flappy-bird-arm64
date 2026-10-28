@@ -196,7 +196,7 @@ func _build_panel() -> void:
 	fb.position = FPS_BTN.position
 	_panel.add_child(fb)
 	_orange(fb, FPS_BTN.size.x)
-	_fps_text = _text(fb, "AUTO", 16, Color.WHITE, Rect2(0, 0, FPS_BTN.size.x, 28), HORIZONTAL_ALIGNMENT_CENTER, Color(191.0 / 255.0, 78.0 / 255.0, 0.0))
+	_fps_text = _text(fb, "AUTO", 16, Color.WHITE, Rect2(0, -3, FPS_BTN.size.x, 28), HORIZONTAL_ALIGNMENT_CENTER, Color(191.0 / 255.0, 78.0 / 255.0, 0.0))   # y -3: centred on the orange face, above its 2 px lip
 
 	_ok = Sprite2D.new()
 	_ok.centered = false
